@@ -1,0 +1,24 @@
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv/
+venv/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+
+# Env / secrets — never commit a nams_ key
+.env
+.env.*
+!.env.example
+
+# Neo4j local data (docker volume bind mounts)
+neo4j-data/
+neo4j-logs/
+
+# OS
+.DS_Store

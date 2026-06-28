@@ -1,0 +1,60 @@
+# Verify 03 — does a runtime ${SESSION_ID} reach BOTH sub-agents identically, and can they share
+# a memory scope through it? (Highest-risk mechanic in the plan.)
+#
+#   export SESSION_ID="$(python -c 'from omnigent_neo4j_memory import mint_session_id; print(mint_session_id())')"
+#   omnigent run scripts/verify/agents/session_check.yaml
+#
+# PASS = both agents echo the SAME id, and agent_b's get_context returns agent_a's stored message.
+# If ${SESSION_ID} is not substituted into sub-agent prompts, fall back to a hard-coded id passed to
+# both, and record that the runtime-dynamic case is unsupported (see VERIFY.md, plan §D7).
+
+name: session_check
+
+prompt: |
+  Run agent_a first, then agent_b. Report both of their outputs verbatim.
+
+executor:
+  harness: claude-sdk
+  model: databricks-claude-sonnet-4-6
+  auth:
+    type: databricks
+    profile: oss
+
+os_env:
+  type: caller_process
+  sandbox:
+    type: linux_bwrap
+    allow_network: true
+
+tools:
+  memory:
+    type: mcp
+    url: http://host.docker.internal:8000
+
+  agent_a:
+    type: agent
+    description: Writes a message under the shared session and echoes the session id.
+    executor:
+      harness: claude-sdk
+      model: databricks-claude-sonnet-4-6
+      auth: { type: databricks, profile: oss }
+    prompt: |
+      First print exactly: SESSION_ID=${SESSION_ID}
+      Then call memory_store_message(session_id="${SESSION_ID}", role="assistant",
+      content="hello from agent_a in ${SESSION_ID}").
+    tools:
+      memory: inherit
+
+  agent_b:
+    type: agent
+    description: Echoes the session id and recalls agent_a's message.
+    executor:
+      harness: claude-sdk
+      model: databricks-claude-sonnet-4-6
+      auth: { type: databricks, profile: oss }
+    prompt: |
+      First print exactly: SESSION_ID=${SESSION_ID}
+      Then call memory_get_context(session_id="${SESSION_ID}", query="hello from agent_a") and report
+      verbatim whether agent_a's message is present.
+    tools:
+      memory: inherit

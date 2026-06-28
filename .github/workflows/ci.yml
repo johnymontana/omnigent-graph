@@ -1,0 +1,61 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  # Fast, deterministic, no external services. This is the gating job.
+  unit:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Install package
+        run: uv pip install --system -e ".[dev]"
+      - name: Import smoke
+        run: python -c "import omnigent_neo4j_memory; print(omnigent_neo4j_memory.__version__)"
+      - name: serve --print-cmd (dry run, no server started)
+        run: omnigent-neo4j-memory serve --print-cmd
+      - name: Unit tests
+        run: pytest -m "not integration" -q
+
+  # The local-Docker-Neo4j path: store + recall round-trip against a real Neo4j.
+  # Uses local sentence-transformers embeddings so no OpenAI key is needed.
+  integration-neo4j:
+    runs-on: ubuntu-latest
+    services:
+      neo4j:
+        image: neo4j:5
+        env:
+          NEO4J_AUTH: neo4j/please-change-me
+        ports:
+          - 7687:7687
+          - 7474:7474
+        options: >-
+          --health-cmd "cypher-shell -u neo4j -p please-change-me 'RETURN 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 30
+    env:
+      NAM_NEO4J__URI: bolt://localhost:7687
+      NAM_NEO4J__USERNAME: neo4j
+      NAM_NEO4J__PASSWORD: please-change-me
+      NAM_EMBEDDING__PROVIDER: sentence_transformers
+      NAM_EMBEDDING__MODEL: BAAI/bge-small-en-v1.5
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+      - name: Install package
+        run: uv pip install --system -e ".[dev]"
+      - name: Integration round-trip (store -> recall)
+        run: pytest -m integration -q

@@ -1,0 +1,30 @@
+# Verify 02 — can an Omnigent agent in its sandbox reach the host-level memory sidecar?
+# Start the sidecar first (omnigent-neo4j-memory serve). Then: omnigent run this file.
+# PASS = the memory tool call succeeds (no "connection refused" / "blocked by proxy").
+# If it fails, try swapping the url between localhost and host.docker.internal, and check the
+# Omnibox network allow-list for your build.
+
+name: egress_check
+
+prompt: |
+  Call memory_get_context(session_id="egress-check", query="ping") exactly once, then report
+  verbatim whether the tool call succeeded or what error it returned. Do nothing else.
+
+executor:
+  harness: claude-sdk
+  model: databricks-claude-sonnet-4-6
+  auth:
+    type: databricks
+    profile: oss
+
+os_env:
+  type: caller_process
+  sandbox:
+    type: linux_bwrap
+    allow_network: true
+
+tools:
+  memory:
+    type: mcp
+    url: http://host.docker.internal:8000   # try http://localhost:8000 if this is blocked
+    tools: [memory_get_context]

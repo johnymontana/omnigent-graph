@@ -1,0 +1,45 @@
+name: omnigent-neo4j-memory
+
+services:
+  # The host-level shared MCP sidecar (ADR-0001). Every Omnigent agent points at
+  # http://localhost:${OMNIGENT_MEMORY_PORT}. The memory credential lives here only,
+  # so sandboxes never see it and only need egress to this one endpoint.
+  #
+  #   NAMS (default):   docker compose up memory-mcp        # MEMORY_API_KEY in .env
+  #   Local Neo4j:      docker compose --profile local up   # brings up neo4j too
+  memory-mcp:
+    build: .
+    image: omnigent-neo4j-memory:local
+    env_file:
+      - path: .env
+        required: false
+    environment:
+      OMNIGENT_MEMORY_HOST: "0.0.0.0"
+      OMNIGENT_MEMORY_PORT: "8000"
+    ports:
+      - "${OMNIGENT_MEMORY_PORT:-8000}:8000"
+    depends_on:
+      neo4j:
+        condition: service_healthy
+        required: false
+    restart: unless-stopped
+
+  # Local Neo4j — only started with `--profile local` (the self-host fallback).
+  neo4j:
+    image: neo4j:5
+    profiles: ["local"]
+    environment:
+      NEO4J_AUTH: "neo4j/${NAM_NEO4J__PASSWORD:-please-change-me}"
+      NAM_NEO4J__PASSWORD: "${NAM_NEO4J__PASSWORD:-please-change-me}"
+      NEO4J_PLUGINS: '["apoc"]'
+    ports:
+      - "7474:7474"
+      - "7687:7687"
+    volumes:
+      - ./neo4j-data:/data
+      - ./neo4j-logs:/logs
+    healthcheck:
+      test: ["CMD-SHELL", "cypher-shell -u neo4j -p \"$${NAM_NEO4J__PASSWORD:-please-change-me}\" 'RETURN 1' || exit 1"]
+      interval: 5s
+      timeout: 5s
+      retries: 40

@@ -1,0 +1,107 @@
+# Polly-memory — a fork of Omnigent's Polly that gives the sub-agents a shared graph brain.
+#
+# What's different from stock Polly: the coder and the (cross-vendor) reviewer share ONE persistent
+# memory workspace via the host-level sidecar (ADR-0001). The coder records a :ReasoningTrace; the
+# reviewer grounds its critique in it instead of re-deriving intent from the diff.
+#
+# Run it (after `omnigent-neo4j-memory serve` / `docker compose up memory-mcp`):
+#   export SESSION_ID="$(python -c 'from omnigent_neo4j_memory import mint_session_id; print(mint_session_id())')"
+#   omnigent run agents/polly-memory.yaml
+#
+# ${SESSION_ID} is substituted by the runner at load time (host-side), so both sub-agents get the
+# SAME id even though sandboxes start with an empty env. This is the documented-mechanism path; the
+# truly-dynamic per-task case is still UNVERIFIED — see scripts/verify/03_session_propagation.
+#
+# NOTE: harness/model ids below assume claude-sdk (vendor A) + codex (vendor B) with Databricks auth.
+# Adjust `executor:` to whatever providers you have configured.
+
+name: polly-memory
+
+prompt: |
+  You are Polly-memory, an orchestrator that gives a memoryless meta-harness a shared graph brain.
+  For the task you are given:
+    1. Delegate the implementation to the `coder` sub-agent.
+    2. Route the resulting diff to the `reviewer` sub-agent — intentionally a DIFFERENT vendor.
+  Both share one persistent memory workspace (session id ${SESSION_ID}). Insist that the reviewer
+  ground its critique in what the coder recorded, citing specific reasoning steps or facts.
+
+executor:
+  harness: claude-sdk
+  model: databricks-claude-sonnet-4-6
+  auth:
+    type: databricks
+    profile: oss
+
+os_env:
+  type: caller_process
+  cwd: ./sample-app
+  sandbox:
+    type: linux_bwrap
+    write_paths: [.]
+    allow_network: true   # sub-agents must reach the memory sidecar — see ADR-0001 + verify/02
+
+tools:
+  # The shared memory workspace — the host-level sidecar over SSE (ADR-0001).
+  memory:
+    type: mcp
+    url: http://host.docker.internal:8000
+
+  coder:
+    type: agent
+    description: Implement the change in a worktree, capturing reasoning into shared memory.
+    executor:
+      harness: claude-sdk                 # vendor A (author)
+      model: databricks-claude-sonnet-4-6
+      auth:
+        type: databricks
+        profile: oss
+    os_env: inherit
+    pass_history: true
+    prompt: |
+      You implement the requested change in the sample app, and you record what you do and why into
+      the shared memory workspace so a different-vendor reviewer can ground its critique in it.
+      Your shared session id is ${SESSION_ID} — pass it as session_id on every memory call.
+
+      Before starting:
+        - memory_get_context(session_id="${SESSION_ID}", query="<the task>")  # recall prior knowledge
+        - memory_start_trace(session_id="${SESSION_ID}", task="<one line>")    # keep the trace_id
+      As you work, after each meaningful step:
+        - memory_record_step(trace_id="<id>", thought="<why>", action="<what>", observation="<result>")
+        - memory_store_message(session_id="${SESSION_ID}", role="assistant", content="<the step>")
+      For durable decisions / hazards:
+        - memory_add_fact(subject="<thing>", predicate="<RELATION>", object_value="<value>",
+                          confidence=0.9, valid_from="<ISO date>", valid_until=<ISO if it can go stale>)
+      When done:
+        - memory_complete_trace(trace_id="<id>", outcome="<summary>", success=true)
+    tools:
+      memory: inherit
+
+  reviewer:
+    type: agent
+    description: Review the diff; ground critique in the author's recorded reasoning.
+    executor:
+      harness: codex                      # vendor B (reviewer) — different from the author
+      model: gpt-5-codex
+    os_env: inherit
+    pass_history: true
+    prompt: |
+      You review the coder's diff. Do NOT re-derive intent from the diff alone — the author recorded
+      their reasoning. Ground your critique in it, by name.
+      Your shared session id is ${SESSION_ID}.
+
+      Before reviewing:
+        - memory_get_context(session_id="${SESSION_ID}", query="<what to review>", include_reasoning=true)
+        - memory_search(query="<the change>", memory_types=["traces"], session_id="${SESSION_ID}")
+        - For prior decisions/hazards on touched entities (no auto-staleness — filter yourself):
+            graph_query(
+              query="MATCH (e:Entity {name:$name})-[r]->(o)
+                     WHERE r.valid_until IS NULL OR r.valid_until > datetime()
+                     RETURN type(r) AS predicate, o.name AS object, r.confidence AS confidence",
+              parameters={"name": "<entity>"})
+      When you find an issue, cite the specific recorded step or fact (e.g. "your trace step noted
+      'token expires in 24h'…"). Then record your verdict:
+        - memory_store_message(session_id="${SESSION_ID}", role="assistant", content="<review>")
+        - memory_add_fact(subject="<entity>", predicate="REVIEW_FLAGGED", object_value="<issue>",
+                          confidence=0.8, valid_from="<ISO date>")
+    tools:
+      memory: inherit

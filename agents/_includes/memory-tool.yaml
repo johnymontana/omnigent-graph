@@ -1,0 +1,26 @@
+# Copy this `tools:` entry into any Omnigent agent to give it the shared memory workspace.
+# It points at the host-level sidecar (ADR-0001) over SSE — NOT a per-agent `command:` MCP, which
+# can't get the credential or egress into each sandbox on alpha Omnigent.
+#
+# Start the sidecar first:
+#   omnigent-neo4j-memory serve            # host process (NAMS by default)
+#   docker compose up memory-mcp           # or containerized
+#
+tools:
+  memory:
+    type: mcp
+    # From inside an Omnigent sandbox, reach the host that runs the sidecar. Which hostname works
+    # depends on your sandbox's network view — verify with scripts/verify/02_sandbox_egress:
+    #   * host process + host agent:   http://localhost:8000
+    #   * containerized sandbox:       http://host.docker.internal:8000
+    url: http://host.docker.internal:8000
+    # Optional allow-list — expose only the tools an agent needs:
+    # tools:
+    #   - memory_get_context
+    #   - memory_search
+    #   - memory_store_message
+    #   - memory_start_trace
+    #   - memory_record_step
+    #   - memory_complete_trace
+    #   - memory_add_fact
+    #   - graph_query
