@@ -34,46 +34,51 @@ tools:
 
 ## Quickstart
 
+Prerequisites (`make prereqs`): Python 3.12+, [uv](https://docs.astral.sh/uv/), Node 22 LTS, `tmux`,
+and model creds (`ANTHROPIC_API_KEY`/`OPENAI_API_KEY` or a logged-in `claude`/`codex` CLI). Then:
+
 ```bash
-pip install omnigent-neo4j-memory          # pulls neo4j-agent-memory[mcp]
-cp .env.example .env                        # then edit
+make setup            # .env + package venv + the Omnigent CLI (uv tool install omnigent)
+$EDITOR .env          # set MEMORY_API_KEY=nams_… and MEMORY_ENDPOINT (NAMS path)
+make serve            # start the host-level memory sidecar on :8000 — leave running
 ```
 
-**Default — NAMS (hosted, zero infra):** put your `MEMORY_API_KEY=nams_…` in `.env`, then:
+`make` targets wrap everything (`make help` to list them). Prefer to wire it by hand?
 
 ```bash
+pip install omnigent-neo4j-memory          # the sidecar + helpers (pulls neo4j-agent-memory[mcp])
+uv tool install omnigent                    # the Omnigent runner — a SEPARATE CLI, not our dep
+cp .env.example .env                        # then edit; MEMORY_API_KEY lives here, on the host only
 omnigent-neo4j-memory serve                 # host-level sidecar over SSE on :8000
-# or: docker compose up memory-mcp
 ```
 
-**Fallback — local Neo4j (no signup):** leave `MEMORY_API_KEY` unset; the local path uses local
-sentence-transformers embeddings so you **don't need an OpenAI key**:
+**Backend selection is by environment:**
 
-```bash
-docker compose --profile local up           # Neo4j + the sidecar pointed at it
-```
+- **NAMS (default, hosted, zero infra):** set `MEMORY_API_KEY=nams_…` and (optionally)
+  `MEMORY_ENDPOINT` in `.env`.
+- **Local Neo4j (no signup):** leave `MEMORY_API_KEY` unset — `make docker-local` brings up Neo4j +
+  the sidecar, using local sentence-transformers embeddings so you **don't need an OpenAI key**.
 
-`serve` picks the backend from the environment. Inspect the resolved command without starting
-anything: `omnigent-neo4j-memory serve --print-cmd`.
+Inspect the resolved command + backend without starting anything: `make print-cmd`.
 
 ## The demo: a Polly fork with a shared brain
 
 [`agents/polly-memory.yaml`](agents/polly-memory.yaml) is a fork of Omnigent's Polly where the coder
-(vendor A) and reviewer (vendor B) share one persistent memory workspace.
+(vendor A) and reviewer (vendor B) share one persistent memory workspace. With the sidecar running:
 
 ```bash
-# 1. start the sidecar (above), then mint + export a shared session id
+make demo             # Run 1 — coder records a :ReasoningTrace; reviewer grounds critique in it
+make demo-cross-run   # seed prior-run knowledge, then a FRESH session recalls it
+```
+
+Each target mints a fresh `SESSION_ID` and passes it to both sub-agents. The manual equivalent:
+
+```bash
 export SESSION_ID="$(python -c 'from omnigent_neo4j_memory import mint_session_id; print(mint_session_id())')"
-
-# 2. Run 1 — coder implements + records a :ReasoningTrace; reviewer grounds critique in it
-omnigent run agents/polly-memory.yaml
-
-# 3. seed prior-run knowledge so cross-run recall is deterministic (honestly labeled — see below)
-python scripts/seed.py
-
-# 4. Run 2 — a FRESH session recalls the seeded RS256 decision + the pyjwt incident #42
+omnigent run agents/polly-memory.yaml                    # Run 1
+python scripts/seed.py                                    # seed prior-run knowledge
 export SESSION_ID="$(python -c 'from omnigent_neo4j_memory import mint_session_id; print(mint_session_id())')"
-omnigent run agents/polly-memory.yaml
+omnigent run agents/polly-memory.yaml                    # Run 2 recalls RS256 + pyjwt incident #42
 ```
 
 The cross-run recall is **seeded for reproducibility** (`scripts/seed.py`) so the demo behaves the
@@ -86,10 +91,8 @@ sidecar, and runtime `session_id` propagation to sub-agents (the highest-risk pi
 checks in [`scripts/verify/VERIFY.md`](scripts/verify/VERIFY.md):
 
 ```bash
-python scripts/verify/01_backend_auth.py        # backend auth + store/recall round-trip
-python scripts/verify/05_cross_run_recall.py    # a new session recalls prior long-term memory
-omnigent run scripts/verify/agents/egress_check.yaml     # sandbox → sidecar egress
-omnigent run scripts/verify/agents/session_check.yaml    # shared ${SESSION_ID} across sub-agents
+make verify            # scriptable: backend auth + store/recall (01) and cross-run recall (05)
+make verify-omnigent   # Omnigent-dependent: sandbox → sidecar egress (02) and session propagation (03)
 ```
 
 ## What's in the box
@@ -103,6 +106,7 @@ omnigent run scripts/verify/agents/session_check.yaml    # shared ${SESSION_ID} 
 | `agents/polly-memory.yaml` + `agents/_includes/` | the demo + the copy-paste `tools.memory` include |
 | `sample-app/` | the toy service the demo iterates on |
 | `scripts/seed.py`, `scripts/verify/` | seed prior-run knowledge; the Phase-1 verification harness |
+| `Makefile` | `make help` — setup, serve, demo, verify, test, docker targets |
 | `docs/` | the [writeup](docs/WRITEUP.md), the [`memory:` block spec](docs/SPEC-memory-block.md), [ADRs](docs/adr/) |
 | [`CONTEXT.md`](CONTEXT.md) | the project glossary (e.g. why we say "memory workspace") |
 
