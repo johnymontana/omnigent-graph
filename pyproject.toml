@@ -7,7 +7,7 @@ name = "omnigent-neo4j-memory"
 version = "0.1.0"
 description = "Graph-native, cross-session, cross-agent memory for Omnigent agents, backed by neo4j-agent-memory / NAMS."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.12"
 license = "Apache-2.0"
 license-files = ["LICENSE"]
 authors = [{ name = "Will Lyon" }]
@@ -17,7 +17,7 @@ classifiers = [
     "Intended Audience :: Developers",
     "License :: OSI Approved :: Apache Software License",
     "Programming Language :: Python :: 3 :: Only",
-    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.12",
     "Topic :: Scientific/Engineering :: Artificial Intelligence",
 ]
 dependencies = [

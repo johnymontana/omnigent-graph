@@ -144,4 +144,5 @@ This is alpha on both sides. Specifically:
 ---
 
 **Try it:** [`github.com/johnymontana/omnigent-graph`](https://github.com/johnymontana/omnigent-graph)
-— `pip install omnigent-neo4j-memory`, start the sidecar, and run the Polly-memory demo.
+— `pip install git+https://github.com/johnymontana/omnigent-graph`, start the sidecar, and run the
+Polly-memory demo.

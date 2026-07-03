@@ -29,8 +29,15 @@ _PASSWORD_PLACEHOLDER = "$NAM_NEO4J__PASSWORD"
 
 
 def resolve_backend() -> str:
-    """``"nams"`` when MEMORY_API_KEY is set, else ``"local"``."""
-    return "nams" if os.environ.get("MEMORY_API_KEY") else "local"
+    """``"nams"`` when a real MEMORY_API_KEY is set, else ``"local"``.
+
+    A blank key, or the ``nams_xxxx…`` placeholder from ``.env.example``, resolves to ``local`` so a
+    copied-but-unedited ``.env`` can't silently boot into NAMS and 401.
+    """
+    key = os.environ.get("MEMORY_API_KEY", "").strip()
+    if key and "xxxx" not in key:
+        return "nams"
+    return "local"
 
 
 def _underlying_cmd() -> List[str]:
@@ -119,6 +126,11 @@ def main(argv: Sequence[str] | None = None) -> int:
 
     if args.command == "serve":
         backend = resolve_backend()
+        raw_key = os.environ.get("MEMORY_API_KEY", "").strip()
+        if raw_key and "xxxx" in raw_key:
+            print("[omnigent-neo4j-memory] MEMORY_API_KEY looks like the .env.example placeholder; "
+                  "falling back to the local backend. Set a real nams_ key to use NAMS.",
+                  file=sys.stderr)
         if args.print_cmd:
             cmd = build_serve_command(args, strict=False)
             print(f"# backend: {backend}")

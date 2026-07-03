@@ -10,10 +10,11 @@ tools:
   memory:
     type: mcp
     # From inside an Omnigent sandbox, reach the host that runs the sidecar. Which hostname works
-    # depends on your sandbox's network view — verify with scripts/verify/02_sandbox_egress:
+    # depends on your sandbox's network view — verify with scripts/verify/agents/egress_check.yaml
+    # (VERIFY.md Check 02):
     #   * host process + host agent:   http://localhost:8000
     #   * containerized sandbox:       http://host.docker.internal:8000
-    url: http://host.docker.internal:8000
+    url: http://localhost:8000
     # Optional allow-list — expose only the tools an agent needs:
     # tools:
     #   - memory_get_context

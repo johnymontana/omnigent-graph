@@ -27,7 +27,8 @@ Safety contract: in capture mode the handler ALWAYS returns ``None`` (never bloc
 it may return ``ASK`` but never ``DENY``, so a slow/flaky memory backend can't wedge an agent. Every
 path is wrapped so memory errors never surface to the agent.
 
-The verified Omnigent contract this relies on (docs/POLICIES.md):
+The Omnigent policy contract this assumes (from Omnigent's UPSTREAM docs/POLICIES.md; alpha and
+unverified against a running server — see ADR-0002):
   event  = {"type": "tool_call"|"tool_result"|"request"|"response", "target": str,
             "data": {"name": str, "arguments": dict}, "context": {...},
             "session_state": dict, "request_data": ...}

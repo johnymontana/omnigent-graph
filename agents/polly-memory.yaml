@@ -9,8 +9,9 @@
 #   omnigent run agents/polly-memory.yaml
 #
 # ${SESSION_ID} is substituted by the runner at load time (host-side), so both sub-agents get the
-# SAME id even though sandboxes start with an empty env. This is the documented-mechanism path; the
-# truly-dynamic per-task case is still UNVERIFIED — see scripts/verify/03_session_propagation.
+# SAME id even though sandboxes start with an empty env. This is the documented-mechanism path; that
+# ${SESSION_ID} interpolates inside `prompt:` bodies is UNVERIFIED — confirm with
+# scripts/verify/agents/session_check.yaml (VERIFY.md Check 03) before trusting cross-agent sharing.
 #
 # NOTE: harness/model ids below assume claude-sdk (vendor A) + codex (vendor B) with Databricks auth.
 # Adjust `executor:` to whatever providers you have configured.
@@ -36,15 +37,19 @@ os_env:
   type: caller_process
   cwd: ./sample-app
   sandbox:
-    type: linux_bwrap
-    write_paths: [.]
-    allow_network: true   # sub-agents must reach the memory sidecar — see ADR-0001 + verify/02
+    # Demo runs unsandboxed so it works on any OS out of the box. For real isolation set
+    #   type: darwin_seatbelt (macOS) | linux_bwrap (Linux)
+    # and keep allow_network: true so sub-agents can reach the sidecar (ADR-0001; verify with
+    # scripts/verify/agents/egress_check.yaml, VERIFY.md Check 02).
+    type: none
 
 tools:
   # The shared memory workspace — the host-level sidecar over SSE (ADR-0001).
   memory:
     type: mcp
-    url: http://host.docker.internal:8000
+    # caller_process (host) reaches the sidecar on localhost. If Omnigent runs the agent inside a
+    # container, use http://host.docker.internal:8000. If the SSE server needs a path, append /sse.
+    url: http://localhost:8000
 
   coder:
     type: agent
@@ -80,8 +85,11 @@ tools:
     type: agent
     description: Review the diff; ground critique in the author's recorded reasoning.
     executor:
-      harness: codex                      # vendor B (reviewer) — different from the author
-      model: gpt-5-codex
+      harness: openai-agents              # vendor B (reviewer) — different from the author
+      model: gpt-5-codex                  # set to a model your OpenAI account / gateway exposes
+      auth:
+        type: api_key
+        api_key: ${OPENAI_API_KEY}        # os_env: inherit does NOT carry model-provider auth
     os_env: inherit
     pass_history: true
     prompt: |

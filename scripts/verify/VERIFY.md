@@ -49,8 +49,9 @@ The trace tools are MCP-only. With the sidecar running, have any MCP client (or 
 trace and then read it back:
 
 1. record: `memory_start_trace(session_id="verify-trace", task="t")` → `memory_record_step(trace_id=…,
-   thought="why", action="do", observation="ok")` → `memory_complete_trace(trace_id=…, success=true)`.
-2. read it back as a *different* reader via `memory_search(memory_types=["traces"],
+   thought="why", action="do", observation="ok")` → `memory_complete_trace(trace_id=…, outcome="ok",
+   success=true)`.
+2. read it back as a *different* reader via `memory_search(query="t", memory_types=["traces"],
    session_id="verify-trace")`, and traverse the graph:
 
 ```cypher

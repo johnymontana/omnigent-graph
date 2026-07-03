@@ -34,9 +34,13 @@ async def _maybe(obj, method_name: str, /, **kwargs):
     if method is None:
         print(f"  · skip {method_name} (not available in this SDK build)")
         return None
-    result = method(**kwargs)
-    if asyncio.iscoroutine(result):
-        result = await result
+    try:
+        result = method(**kwargs)
+        if asyncio.iscoroutine(result):
+            result = await result
+    except Exception as exc:  # signature drift / backend error — stay best-effort
+        print(f"  · skip {method_name} ({type(exc).__name__}: {exc})")
+        return None
     print(f"  ✓ {method_name}({', '.join(f'{k}={v!r}' for k, v in list(kwargs.items())[:2])}…)")
     return result
 

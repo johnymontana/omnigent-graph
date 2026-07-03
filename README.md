@@ -46,7 +46,8 @@ make serve            # start the host-level memory sidecar on :8000 — leave r
 `make` targets wrap everything (`make help` to list them). Prefer to wire it by hand?
 
 ```bash
-pip install omnigent-neo4j-memory          # the sidecar + helpers (pulls neo4j-agent-memory[mcp])
+# not yet on PyPI — install the sidecar + helpers from source (pulls neo4j-agent-memory[mcp]):
+pip install git+https://github.com/johnymontana/omnigent-graph
 uv tool install omnigent                    # the Omnigent runner — a SEPARATE CLI, not our dep
 cp .env.example .env                        # then edit; MEMORY_API_KEY lives here, on the host only
 omnigent-neo4j-memory serve                 # host-level sidecar over SSE on :8000

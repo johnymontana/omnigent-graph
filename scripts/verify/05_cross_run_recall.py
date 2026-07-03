@@ -23,8 +23,11 @@ async def _maybe(obj, name, /, **kwargs):
     m = getattr(obj, name, None)
     if m is None:
         return None
-    r = m(**kwargs)
-    return await r if asyncio.iscoroutine(r) else r
+    try:
+        r = m(**kwargs)
+        return await r if asyncio.iscoroutine(r) else r
+    except Exception:
+        return None
 
 
 async def main() -> int:

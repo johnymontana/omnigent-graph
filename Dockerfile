@@ -6,7 +6,8 @@ FROM python:3.12-slim
 WORKDIR /app
 
 # Install the package (which pulls neo4j-agent-memory[mcp]).
-COPY pyproject.toml README.md ./
+# LICENSE is required because pyproject declares `license-files = ["LICENSE"]`.
+COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
 RUN pip install --no-cache-dir .
 

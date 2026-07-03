@@ -16,6 +16,9 @@ services:
     environment:
       OMNIGENT_MEMORY_HOST: "0.0.0.0"
       OMNIGENT_MEMORY_PORT: "8000"
+      # Inside the compose network the DB is reachable as `neo4j`, not localhost. Ignored in NAMS
+      # mode (MEMORY_API_KEY set); used by the `--profile local` path.
+      NAM_NEO4J__URI: "bolt://neo4j:7687"
     ports:
       - "${OMNIGENT_MEMORY_PORT:-8000}:8000"
     depends_on:
