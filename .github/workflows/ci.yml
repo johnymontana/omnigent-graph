@@ -56,7 +56,7 @@ jobs:
           python-version: "3.12"
       - name: Install uv
         uses: astral-sh/setup-uv@v5
-      - name: Install package
-        run: uv pip install --system -e ".[dev]"
+      - name: Install package (+ local embedder; pulls sentence-transformers/torch — slower)
+        run: uv pip install --system -e ".[dev,local]"
       - name: Integration round-trip (store -> recall)
         run: pytest -m integration -q

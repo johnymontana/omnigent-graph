@@ -7,9 +7,11 @@ WORKDIR /app
 
 # Install the package (which pulls neo4j-agent-memory[mcp]).
 # LICENSE is required because pyproject declares `license-files = ["LICENSE"]`.
+# [local] adds the sentence-transformers embedder so `docker compose --profile local up` works
+# without an OpenAI key. NAMS-only users can drop it (embeddings run server-side) to slim the image.
 COPY pyproject.toml README.md LICENSE ./
 COPY src ./src
-RUN pip install --no-cache-dir .
+RUN pip install --no-cache-dir ".[local]"
 
 EXPOSE 8000
 

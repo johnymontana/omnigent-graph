@@ -39,10 +39,16 @@ init: ## Create .env from .env.example (if missing)
 	@test -f .env && echo ".env present."
 
 .PHONY: install
-install: ## Create .venv and install this package (editable) + dev deps
+install: ## Create .venv and install this package (editable) + dev deps (NAMS path)
 	uv venv $(VENV)
 	uv pip install --python $(PY) -e ".[dev]"
-	@echo "Installed. (neo4j-agent-memory[mcp] is heavy — spaCy/GLiNER/embeddings — this is expected.)"
+	@echo "Installed for the NAMS path. For local Neo4j (no key) use: make install-local"
+
+.PHONY: install-local
+install-local: ## Install with the local embedding backend (self-host Neo4j, no API key)
+	uv venv $(VENV)
+	uv pip install --python $(PY) -e ".[dev,local]"
+	@echo "Installed with [local] — sentence-transformers embedder (no OpenAI key needed)."
 
 .PHONY: install-omnigent
 install-omnigent: ## Install the Omnigent CLI (separate tool, on PATH)

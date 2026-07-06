@@ -9,7 +9,6 @@ Two things live here:
 
 from __future__ import annotations
 
-import os
 import uuid
 from contextlib import asynccontextmanager
 
@@ -64,28 +63,18 @@ def reasoning_steps_for_session(session_id: str) -> str:
 
 @asynccontextmanager
 async def open_memory():
-    """Open a `MemoryClient` from the environment. Async context manager.
+    """Open a `MemoryClient` from the environment (env-driven, exactly like the sidecar).
 
-    NAMS when ``MEMORY_API_KEY`` is set; otherwise local Neo4j via ``NAM_NEO4J__*``. Embedding /
-    extraction config (e.g. ``NAM_EMBEDDING__PROVIDER=sentence_transformers`` for the offline local
-    path) is read from the environment by the underlying client.
+    NAMS when ``MEMORY_API_KEY`` is set; otherwise local Neo4j via ``NAM_NEO4J__*`` (auto-resolved
+    when no key is present). Embedding + extraction config is read from the environment too — e.g.
+    ``NAM_EMBEDDING__PROVIDER=sentence_transformers`` for the offline local path, which needs the
+    local backend installed (``pip install '.[local]'``; the base ``[mcp]`` extra ships no embedder,
+    so the client would otherwise fall back to the OpenAI embedder and require a key).
+
+    We deliberately do NOT pass an explicit ``MemorySettings`` here: doing so bypasses this env-based
+    config and silently reinstates the OpenAI embedder default.
     """
-    from neo4j_agent_memory import MemoryClient, MemorySettings  # lazy: heavy import
+    from neo4j_agent_memory import MemoryClient  # lazy: heavy import
 
-    if os.environ.get("MEMORY_API_KEY"):
-        # NAMS auto-selected when MEMORY_API_KEY is present.
-        async with MemoryClient() as memory:
-            yield memory
-    else:
-        from pydantic import SecretStr
-
-        settings = MemorySettings(
-            neo4j={
-                "uri": os.environ.get("NAM_NEO4J__URI", "bolt://localhost:7687"),
-                "username": os.environ.get("NAM_NEO4J__USERNAME", "neo4j"),
-                "password": SecretStr(os.environ.get("NAM_NEO4J__PASSWORD", "please-change-me")),
-                "database": os.environ.get("NAM_NEO4J__DATABASE", "neo4j"),
-            }
-        )
-        async with MemoryClient(settings) as memory:
-            yield memory
+    async with MemoryClient() as memory:
+        yield memory

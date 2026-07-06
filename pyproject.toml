@@ -26,6 +26,11 @@ dependencies = [
 ]
 
 [project.optional-dependencies]
+# Local (self-host Neo4j) path: a local embedding backend so no OpenAI key is needed. NAMS mode does
+# NOT need this — embeddings are computed server-side. The base [mcp] extra ships no embedder.
+local = [
+    "neo4j-agent-memory[sentence-transformers]",
+]
 dev = [
     "pytest>=8",
     "pytest-asyncio>=0.23",

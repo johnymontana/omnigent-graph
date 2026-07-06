@@ -57,8 +57,10 @@ omnigent-neo4j-memory serve                 # host-level sidecar over SSE on :80
 
 - **NAMS (default, hosted, zero infra):** set `MEMORY_API_KEY=nams_…` and (optionally)
   `MEMORY_ENDPOINT` in `.env`.
-- **Local Neo4j (no signup):** leave `MEMORY_API_KEY` unset — `make docker-local` brings up Neo4j +
-  the sidecar, using local sentence-transformers embeddings so you **don't need an OpenAI key**.
+- **Local Neo4j (no signup):** leave `MEMORY_API_KEY` unset. `make docker-local` brings up Neo4j +
+  the sidecar (the image bundles the local embedder). For the **host** path, install the embedder
+  with `make install-local` (`.[local]`) — the base package ships none and would otherwise need an
+  OpenAI key. Uses local sentence-transformers embeddings, so **no OpenAI key**.
 
 Inspect the resolved command + backend without starting anything: `make print-cmd`.
 
