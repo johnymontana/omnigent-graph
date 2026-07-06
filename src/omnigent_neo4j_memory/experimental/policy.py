@@ -70,25 +70,26 @@ class _Recorder:
         except queue.Full:
             pass  # drop under overload — capture is best-effort
 
+    async def _process(self, coro_factory) -> None:
+        try:
+            from ..helpers import open_memory
+
+            async with open_memory() as memory:
+                await coro_factory(memory)
+        except Exception:
+            pass  # never let capture errors surface
+
     def _run(self) -> None:
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
-
-        async def drain() -> None:
+        try:
             while True:
-                coro_factory = await loop.run_in_executor(None, self._q.get)
+                # Block in THIS daemon thread (not a non-daemon executor thread, which would keep the
+                # process alive at exit). The thread is a daemon, so a blocking get() is safe.
+                coro_factory = self._q.get()
                 if coro_factory is None:
                     return
-                try:
-                    from ..helpers import open_memory
-
-                    async with open_memory() as memory:
-                        await coro_factory(memory)
-                except Exception:
-                    pass  # never let capture errors surface
-
-        try:
-            loop.run_until_complete(drain())
+                loop.run_until_complete(self._process(coro_factory))
         finally:
             loop.close()
 

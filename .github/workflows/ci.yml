@@ -47,8 +47,7 @@ jobs:
       NAM_NEO4J__URI: bolt://localhost:7687
       NAM_NEO4J__USERNAME: neo4j
       NAM_NEO4J__PASSWORD: please-change-me
-      NAM_EMBEDDING__PROVIDER: sentence_transformers
-      NAM_EMBEDDING__MODEL: BAAI/bge-small-en-v1.5
+      NAM_EMBEDDING: sentence-transformers/all-MiniLM-L6-v2
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5

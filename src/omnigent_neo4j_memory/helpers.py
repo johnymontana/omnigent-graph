@@ -9,6 +9,7 @@ Two things live here:
 
 from __future__ import annotations
 
+import os
 import uuid
 from contextlib import asynccontextmanager
 
@@ -63,18 +64,35 @@ def reasoning_steps_for_session(session_id: str) -> str:
 
 @asynccontextmanager
 async def open_memory():
-    """Open a `MemoryClient` from the environment (env-driven, exactly like the sidecar).
+    """Open a `MemoryClient` from the environment. Async context manager.
 
-    NAMS when ``MEMORY_API_KEY`` is set; otherwise local Neo4j via ``NAM_NEO4J__*`` (auto-resolved
-    when no key is present). Embedding + extraction config is read from the environment too — e.g.
-    ``NAM_EMBEDDING__PROVIDER=sentence_transformers`` for the offline local path, which needs the
-    local backend installed (``pip install '.[local]'``; the base ``[mcp]`` extra ships no embedder,
-    so the client would otherwise fall back to the OpenAI embedder and require a key).
+    NAMS when ``MEMORY_API_KEY`` is set (embeddings computed server-side — no local embedder needed).
+    Otherwise local Neo4j via ``NAM_NEO4J__*`` with an explicit local embedder.
 
-    We deliberately do NOT pass an explicit ``MemorySettings`` here: doing so bypasses this env-based
-    config and silently reinstates the OpenAI embedder default.
+    Why the embedder is set as a provider-prefixed STRING: ``MemorySettings`` resolves a string
+    ``embedding`` through ``from_provider()``, whose token for local embeddings is
+    ``"sentence-transformers"`` (hyphen). The nested ``NAM_EMBEDDING__PROVIDER`` enum path uses
+    ``"sentence_transformers"`` (underscore) and is unreliable, and a bare ``MemoryClient()`` does not
+    read the embedding env at all — both leave the OpenAI embedder default in place (needs a key).
+    Requires the local backend: ``pip install '.[local]'``.
     """
     from neo4j_agent_memory import MemoryClient  # lazy: heavy import
 
-    async with MemoryClient() as memory:
-        yield memory
+    if os.environ.get("MEMORY_API_KEY"):
+        async with MemoryClient() as memory:
+            yield memory
+    else:
+        from neo4j_agent_memory import MemorySettings
+        from pydantic import SecretStr
+
+        settings = MemorySettings(
+            neo4j={
+                "uri": os.environ.get("NAM_NEO4J__URI", "bolt://localhost:7687"),
+                "username": os.environ.get("NAM_NEO4J__USERNAME", "neo4j"),
+                "password": SecretStr(os.environ.get("NAM_NEO4J__PASSWORD", "please-change-me")),
+                "database": os.environ.get("NAM_NEO4J__DATABASE", "neo4j"),
+            },
+            embedding=os.environ.get("NAM_EMBEDDING", "sentence-transformers/all-MiniLM-L6-v2"),
+        )
+        async with MemoryClient(settings) as memory:
+            yield memory
